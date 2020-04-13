@@ -1,5 +1,5 @@
 import math
-import os
+import os, platform
 import random
 import time
 from threading import Thread
@@ -7,7 +7,9 @@ from typing import List, Dict
 
 from pafy.backend_youtube_dl import YtdlPafy
 
-os.add_dll_directory("C:\Program Files (x86)\VideoLAN\VLC") # this is windows specific. you need a vlc
+system_name = platform.system().lower()
+if system_name == 'windows':
+    os.add_dll_directory("C:\Program Files (x86)\VideoLAN\VLC") # this is windows specific, and generally computer specific as well. you need a vlc
 
 
 import pafy
@@ -90,7 +92,7 @@ class YTAudio:
     def play_continuous(self) -> None:
         while self.playing:
             self.current_time = self.player.get_time() / 1000
-            if self.current_time >= self.length - 1.1: # for some reason, there is a bit of a discrepancy between length and where it ends
+            if self.current_time >= self.length - 2: # for some reason, there is a bit of a discrepancy between length and where it ends
                 break
             while self.paused:
                 time.sleep(0.1)
