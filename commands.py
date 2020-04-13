@@ -1,17 +1,35 @@
 import audio_manager
 
-COMMANDS = {
-    'pause': audio_manager.pause,
-    'skip': audio_manager.skip,
-    'resume': audio_manager.resume,
-    'play': audio_manager.soft_play,
-    'restart': audio_manager.restart,
-    'stop': audio_manager.stop
-}
+def help ():
+    global COMMANDS
+    print('Here are all the commands:')
+    for com in COMMANDS.keys():
+        print("==> %s"%com)
 
-def process_command (command:str):
-    command = command.lower().rstrip()
-    if command in COMMANDS:
-        COMMANDS[command]() # do the command
+COMMANDS = {
+    'help': help,
+    'play': audio_manager.soft_play,
+    'move': audio_manager.moveto,
+    'auto': 'info,goto,list,rel,back,forward,check,stop,restart,resume,skip,pause'.split(',')
+}
+for a in COMMANDS['auto']:
+    if a in COMMANDS.keys():
+        continue
+    if hasattr(audio_manager, a):
+        COMMANDS[a] = getattr(audio_manager, a)
+
+def process_command (input_text:str):
+    input_text = input_text.lower().strip()
+    commands = input_text.split(' ')
+    command = commands[0] # command name
+    if len(commands) > 1:
+        args = commands[1:]
     else:
-        print('%s is not a valid command'%command)
+        args = []
+    if command in COMMANDS:
+        try:
+            COMMANDS[command](*args) # do the command
+        except:
+            COMMANDS[command]()
+    else:
+        print('%s is not a valid command' % command)
