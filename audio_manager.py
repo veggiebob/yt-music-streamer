@@ -78,11 +78,14 @@ class YTAudio:
             raise Exception("Needs media initialization!")
         if not self.has_player:
             raise Exception("Need to attach a player!")
-
+        if self.playing:
+            print('already playing!')
+            return
         self.player.set_media(self.media)
         self.player.play()
         self.playing = True
         self.paused = False
+        self.finished = False
         self.current_time = 0
         play = Thread(target=self.play_continuous)
         play.start()
@@ -90,9 +93,10 @@ class YTAudio:
         play.join()
 
     def play_continuous(self) -> None:
-        while self.playing:
+        while self.playing and not self.finished:
             self.current_time = self.player.get_time() / 1000
             if self.current_time >= self.length - 2: # for some reason, there is a bit of a discrepancy between length and where it ends
+                self.stop()
                 break
             while self.paused:
                 time.sleep(0.1)
@@ -108,7 +112,10 @@ class YTAudio:
         self.paused = False
 
     def stop(self):
+        if self.finished:
+            return
         self.player.stop()
+        self.paused = False
         self.playing = False
         self.finished = True
 
@@ -241,7 +248,6 @@ def play(repeat=False):
         clip.start()  # start the yt video
         while not clip.finished:
             time.sleep(0.1)
-        clip.stop()
         currently_playing += 1
         if currently_playing >= len(AUDIOS):
             if repeat:
@@ -282,7 +288,11 @@ def resume():
 
 def skip():
     get_current().stop()
-    print('skipped')
+    # print('skipped')
+
+def skip_all():
+    for a in AUDIOS:
+        a.stop()
 
 def soft_play():
     if not is_playing:
@@ -291,9 +301,8 @@ def soft_play():
     else:
         if is_paused:
             resume()
-        else:
-            print('had no effect')
-            return
+        elif not get_current().playing:
+            get_current().start()
 
 def stop():
     global is_playing
@@ -349,7 +358,9 @@ def back (*args):
     rel(*ar)
 
 def check (*args):
-    print('time: %s, notes: %s'%(get_current().get_time(), ' '.join(args)))
+    print('time: %s  %s'%(get_current().get_time(), ' '.join(args)))
+    print('player is playing? %s'%get_current().player.is_playing())
+    print('is playing? %s'%get_current().playing)
 
 # INFO
 
@@ -365,9 +376,10 @@ def goto (*args):
     index = int(args[0])
     if not 0 <= index < len(AUDIOS):
         print('%d is not a valid clip number. goto <num> WHERE 0 <= num <= %d'%(index, len(AUDIOS) - 1))
+        return
     print('going to clip %d: %s'%(index, AUDIOS[index].title))
-    currently_playing = index
-    restart()
+    currently_playing = index - 1 # it will increment this when it finishes the song
+    skip()
 
 def info ():
     print('currently playing: %s'%get_current().title)
