@@ -1,11 +1,13 @@
 import math
 import os, platform
 import random
+import sys
 import time
 from threading import Thread
 from typing import List, Dict
 
 from pafy.backend_youtube_dl import YtdlPafy
+from youtube_dl.utils import ExtractorError
 
 system_name = platform.system().lower()
 if system_name == 'windows':
@@ -35,7 +37,7 @@ class YTAudio:
 
         # state control
         self.playing = False
-        self.finished = True
+        self.finished = False
         self.paused = False
         self.current_time = 0
 
@@ -93,7 +95,7 @@ class YTAudio:
         play.join()
 
     def play_continuous(self) -> None:
-        while self.playing and not self.finished:
+        while self.playing:
             self.current_time = self.player.get_time() / 1000
             if self.current_time >= self.length - 2: # for some reason, there is a bit of a discrepancy between length and where it ends
                 self.stop()
@@ -199,7 +201,11 @@ PLAYER.set_mrl('', ":no-video")
 # PLAYLIST INITIALIZATION
 
 def add_video(url):
-    AUDIOS.append(YTAudio(url, vlc_instance=VLC, player=PLAYER))
+    try:
+        AUDIOS.append(YTAudio(url, vlc_instance=VLC, player=PLAYER))
+        print('added %s'%AUDIOS[-1].title)
+    except:
+        print(f"aw. getting video {url} didn't work.")
 
 def add_csv (filename):
     try:
@@ -222,7 +228,8 @@ def add_playlist (url):
 
 
 def shuffle():
-    global AUDIOS
+    global AUDIOS, currently_playing
+    get_current().stop()
     new_list = []
     while len(AUDIOS) > 0:
         aud = AUDIOS[random.randrange(len(AUDIOS))]
@@ -230,6 +237,7 @@ def shuffle():
         AUDIOS.remove(aud)
 
     AUDIOS = new_list
+    currently_playing = 0
 
 
 def start_playlist(repeat=False):
@@ -257,6 +265,7 @@ def play(repeat=False):
 
     print('finished playing')
     stop()
+    sys.exit()
 
 # OTHER MANAGEMENT
 
@@ -361,6 +370,7 @@ def check (*args):
     print('time: %s  %s'%(get_current().get_time(), ' '.join(args)))
     print('player is playing? %s'%get_current().player.is_playing())
     print('is playing? %s'%get_current().playing)
+    print('is finished? %s'%get_current().finished)
 
 # INFO
 
@@ -377,7 +387,7 @@ def goto (*args):
     if not 0 <= index < len(AUDIOS):
         print('%d is not a valid clip number. goto <num> WHERE 0 <= num <= %d'%(index, len(AUDIOS) - 1))
         return
-    print('going to clip %d: %s'%(index, AUDIOS[index].title))
+    # print('going to clip %d: %s'%(index, AUDIOS[index].title))
     currently_playing = index - 1 # it will increment this when it finishes the song
     skip()
 
@@ -385,3 +395,10 @@ def info ():
     print('currently playing: %s'%get_current().title)
     print("time: %s, length: %s"%(get_current().get_time(), get_current().get_length()))
     print('next up: %s'%get_next().title)
+
+def get_link ():
+    url = get_current().yt_video_url
+    has_q = url.find('?') >= 0
+    time_url = url + ('&' if has_q else '?') + 't=%d'%int(get_current().current_time)
+    print(f'video: {url}')
+    print('video at current time: %s'%time_url)

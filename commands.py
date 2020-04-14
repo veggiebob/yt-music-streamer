@@ -10,7 +10,9 @@ COMMANDS = {
     'help': help,
     'play': audio_manager.soft_play,
     'move': audio_manager.moveto,
-    'auto': 'info,goto,list,rel,back,forward,check,stop,restart,resume,skip,pause'.split(',')
+    'linkme': audio_manager.get_link,
+    'link': audio_manager.get_link,
+    'auto': 'info,goto,list,rel,back,forward,check,stop,restart,resume,skip,pause,shuffle'.split(',')
 }
 for a in COMMANDS['auto']:
     if a in COMMANDS.keys():
