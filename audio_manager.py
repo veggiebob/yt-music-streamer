@@ -33,6 +33,7 @@ class YTAudio:
         self.initialized = False
         self.has_media = False
         self.player:vlc.MediaPlayer = None
+        self.vlc_instance = None
         self.has_player = False
 
         # state control
@@ -58,21 +59,28 @@ class YTAudio:
         self.initialized = True
 
         if vlc_instance is not None:
-            self.init_media(vlc_instance)
+            self.vlc_instance = vlc_instance
         if player is not None:
             self.attach_player(player)
+
+        if self.vlc_instance is not None:
+            self.init_media()
 
     def attach_player(self, player):
         self.player = player
         self.has_player = True
 
-    def init_media(self, vlc_instance):
+    def init_media(self):
         if not self.initialized:
             self.init()
-        self.media = vlc_instance.media_new(self.best_audio_url)
+        self.media = self.vlc_instance.media_new(self.best_audio_url)
         self.media.get_mrl()
         self.has_media = True
-
+    def _player_ready (self) -> bool:
+        return self.player.will_play() == 1 and self.player.play() == 0 and self.player.is_playing()
+    def _reset_player (self):
+        self.player.set_media(self.media)
+        self.player.play()
     def start(self):
         if not self.initialized:
             raise Exception("Needs initialization!")
@@ -84,25 +92,49 @@ class YTAudio:
             print('already playing!')
             return
         self.player.set_media(self.media)
-        self.player.play()
+        max_iters = 5
+        while not self._player_ready(): # wait for the poor player to struggle with itself
+            try:
+                self._reset_player() # re-attach media and stuff
+            except:
+                self.init() # reset media and everything else
+            time.sleep(1)
+            max_iters -= 1
+            if max_iters < 0:
+                self.stop()
+                print('could not resolve audio problem. stopping and skipping.')
+                return
+
         self.playing = True
         self.paused = False
         self.finished = False
         self.current_time = 0
-        play = Thread(target=self.play_continuous)
-        play.start()
-        # play.join(timeout=self.length) # because you can pause
-        play.join()
+        playplay = Thread(target=self.play_continuous)
+        playplay.start()
+        # playplay.join(timeout=self.length) # doesn't work because you can pause
+        playplay.join()
 
     def play_continuous(self) -> None:
+        print('started!')
         while self.playing:
             self.current_time = self.player.get_time() / 1000
+            if not self.player.is_playing():
+                print('not playing')
+                print('will play? %s'%self.player.will_play())
+                if self.player.will_play() == 0: # if it doesn't want to play
+
+                    ok = self.player.play() == 0
+                    self.player.set_pause(False)
+                    print('trying to re-play. ok? %s'%ok)
+                    time.sleep(3)
+                else:
+                    print('nyehhh')
+                    time.sleep(3)
             if self.current_time >= self.length - 2: # for some reason, there is a bit of a discrepancy between length and where it ends
                 self.stop()
                 break
             while self.paused:
                 time.sleep(0.1)
-
         self.finished = True
 
     def pause(self):
@@ -117,6 +149,8 @@ class YTAudio:
         if self.finished:
             return
         self.player.stop()
+        while self.player.is_playing():
+            time.sleep(0.1)
         self.paused = False
         self.playing = False
         self.finished = True
@@ -194,9 +228,10 @@ is_paused = False
 
 # window setup ?
 VLC = vlc.Instance()
-PLAYER = VLC.media_player_new()
+PLAYER:vlc.MediaPlayer = VLC.media_player_new()
 PLAYER.set_mrl('', ":no-video")
-
+print('setting up player . . . ')
+time.sleep(1)
 
 # PLAYLIST INITIALIZATION
 
@@ -242,6 +277,7 @@ def shuffle():
 
 def start_playlist(repeat=False):
     global is_playing
+    time.sleep(1) # give it time for no reason?
     the_play = Thread(target=play, args=(repeat,))
     is_playing = True
     the_play.start()
