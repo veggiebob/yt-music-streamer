@@ -81,6 +81,22 @@ class YTAudio:
     def _reset_player (self):
         self.player.set_media(self.media)
         self.player.play()
+    def _wrestle_the_player (self):
+        max_iters = 10
+        while not self._player_ready():  # wait for the poor player to struggle with itself
+            try:
+                self._reset_player()  # re-attach media and stuff
+            except:
+                try:
+                    self.init()  # reset media and everything else
+                except:
+                    pass
+            time.sleep(1)
+            max_iters -= 1
+            if max_iters < 0:
+                self.stop()
+                print('could not resolve audio problem. stopping and skipping.')
+                return
     def start(self):
         if not self.initialized:
             raise Exception("Needs initialization!")
@@ -92,19 +108,7 @@ class YTAudio:
             print('already playing!')
             return
         self.player.set_media(self.media)
-        max_iters = 5
-        while not self._player_ready(): # wait for the poor player to struggle with itself
-            try:
-                self._reset_player() # re-attach media and stuff
-            except:
-                self.init() # reset media and everything else
-            time.sleep(1)
-            max_iters -= 1
-            if max_iters < 0:
-                self.stop()
-                print('could not resolve audio problem. stopping and skipping.')
-                return
-
+        self._wrestle_the_player()
         self.playing = True
         self.paused = False
         self.finished = False
@@ -115,21 +119,11 @@ class YTAudio:
         playplay.join()
 
     def play_continuous(self) -> None:
-        print('started!')
+        # print('started!')
         while self.playing:
             self.current_time = self.player.get_time() / 1000
-            if not self.player.is_playing():
-                print('not playing')
-                print('will play? %s'%self.player.will_play())
-                if self.player.will_play() == 0: # if it doesn't want to play
-
-                    ok = self.player.play() == 0
-                    self.player.set_pause(False)
-                    print('trying to re-play. ok? %s'%ok)
-                    time.sleep(3)
-                else:
-                    print('nyehhh')
-                    time.sleep(3)
+            if not self.player.is_playing() and not self.paused:
+                self._wrestle_the_player()
             if self.current_time >= self.length - 2: # for some reason, there is a bit of a discrepancy between length and where it ends
                 self.stop()
                 break
@@ -309,7 +303,7 @@ def get_current () -> YTAudio:
     return AUDIOS[currently_playing]
 
 def get_next () -> YTAudio:
-    return AUDIOS[currently_playing + 1] # works because of list wrapping
+    return AUDIOS[(currently_playing + 1)%len(AUDIOS)] # works because of list wrapping
 
 # PLAYLIST CONTROL
 
@@ -333,7 +327,7 @@ def resume():
 
 def skip():
     get_current().stop()
-    # print('skipped')
+    print('skipped')
 
 def skip_all():
     for a in AUDIOS:
